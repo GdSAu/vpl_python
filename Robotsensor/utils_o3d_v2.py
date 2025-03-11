@@ -86,7 +86,7 @@ def Get_Pointcloud(scene, fov, center, eye, up, width, height, direccion, i,iter
       #print(Nube_acc)
     o3d.io.write_point_cloud(direccion + "/Point_cloud/"+ itera + "cloud_acc.pcd", Nube_acc, write_ascii=True)# accumulated cloud 
 
-def Get_octree(octree, direccion, i, itera, origin, puntos): #,arreglo):
+def Get_octree(octree, direccion, i, itera, origin, puntos, dim_arreglo):
   '''octree -> occupation prob [n,]
     octree: octree object
     direccion: root folder direction
@@ -100,7 +100,7 @@ def Get_octree(octree, direccion, i, itera, origin, puntos): #,arreglo):
       maxrange=-1, # maximum range for how long individual beams are inserted
       )  
   #arreglo = np.ndarray([29791], dtype=float)
-  arreglo = np.full((29791), 0.5)
+  arreglo = np.full((dim_arreglo), 0.5)
   j = 0 
   for i in puntos:
       #Get occupancy probability given a position (x,y,z)
