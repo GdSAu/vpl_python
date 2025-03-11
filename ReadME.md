@@ -26,7 +26,12 @@ So the dataset is ordered as follows:
         - Object_Point_Cloud
     + RGB
 
+The format for the captured data is:
 
++ RGB_#.png
++ D_#.tiff
++ cloud_#.pcd
++ grid_#.npy and octree_1.pcd
 
 ## Environment setup
 

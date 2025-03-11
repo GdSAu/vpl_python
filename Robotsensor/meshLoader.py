@@ -1,7 +1,15 @@
 import open3d as o3d
-from utils_o3d_v2 import scale_and_translate
+from Robotsensor.utils_o3d_v2 import scale_and_translate
 
 class SceneLoader:
+    '''
+    This class load the meshes and textures of a model
+    also an floor can be added
+    returns an: 
+        offrender scene - to extract depth and RGB images
+        raycast scene - to extract pointclouds 
+    '''
+
     def __init__(self, mesh_file, floor=True, scale=True, scale_factor=0.4, floor_size= 20, floor_depth=0.01):
         self.mesh_file = mesh_file
         self.scale = scale
