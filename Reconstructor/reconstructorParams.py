@@ -1,6 +1,6 @@
 import yaml
 
-class reconstructorParams:
+class Params:
 
     def __init__(self,filename):
         with open(filename, 'r') as file:

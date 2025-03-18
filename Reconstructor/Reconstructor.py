@@ -5,22 +5,22 @@ import pandas as pd
 
 from Robotsensor.utils_o3d_v2 import Get_PointcloudGT, Get_voxpoints
 from Robotsensor.meshLoader import SceneLoader
-from reconstructorParams import reconstructorParams
 from Robotsensor.sensor import Sensor
 from Partialmodel.modelupdate import updateModel
+from Reconstructor.reconstructorParams import Params
 
 class Reconstructor:
 
     def __init__(self,file_name):
         self.file_name = file_name
         self.metricas = {"ID": [],"id_objeto": [], "iteracion_objeto":[],"pose_inicial":[], "nube_puntos":[], "rejilla":[], "nbv":[], "id_anterior":[], "id_siguiente":[], "chamfer":[], "ganancia_cobertura":[], "cobertura":[]}
-        self.loadParams()
+        self.__loadParams()
     
-    def readParams(self):
-        self.params = reconstructorParams(self.file_name)
+    def __readParams(self):
+        self.params = Params(self.file_name)
 
-    def loadParams(self):
-        self.readParams()
+    def __loadParams(self):
+        self.__readParams()
         self.carpeta_metodo = self.params.getCarpetaMetodo()
         self.carpeta_iter = self.params.getCarpetaIter()
         self.direccion = self.params.getDireccionCarpeta()
@@ -35,7 +35,7 @@ class Reconstructor:
         self.voxel_resolution = self.params.getVoxelVariable()
         self.dim_arreglo = 32768
     
-    def createFolder(self, dir_carpeta):
+    def __createFolder(self, dir_carpeta):
         try:
             if os.path.lexists(dir_carpeta+"Point_cloud/"+self.carpeta_metodo) == False:
                 os.mkdir(dir_carpeta +"Point_cloud/" + self.carpeta_metodo)
@@ -50,7 +50,7 @@ class Reconstructor:
         except:
             print("La carpeta de {} ya existe, no se sobreescribe".format(self.carpeta_iter))
 
-    def initSensor(self,dir_carpeta,render,scene):
+    def __initSensor(self,dir_carpeta,render,scene):
         miSensor = Sensor(self.fov,self.up,dir_carpeta,self.carpeta_iter,self.img_W,self.img_H,render=render,scene=scene)
         return miSensor
     
@@ -62,7 +62,7 @@ class Reconstructor:
             dir_carpeta = self.direccion + self.listado_objetos[l] + "/"
             
             #Creamos la carpeta contenedora del experimento
-            self.createFolder(dir_carpeta)
+            self.__createFolder(dir_carpeta)
             
             # TODO: esto va en el viewplanner
             #Cargamos los modelos de predicción de posición
@@ -91,7 +91,7 @@ class Reconstructor:
             puntos = Get_voxpoints()
             
             #Set sensor
-            sensor = Sensor(self.fov,self.up,self.carpeta_iter,self.img_W,self.img_H,render = render, scene=scene)
+            sensor = self.__initSensor(dir_carpeta,render,scene)
             #Set partialmodel
             partialmodel = updateModel(self.carpeta_iter)
             
