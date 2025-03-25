@@ -2,8 +2,10 @@ from abc import ABC, abstractmethod
 from typing import List, Tuple
 import numpy as np
 import octomap
+import open3d as o3d
+import trimesh
 
-class PartialModelBase:
+class PartialModelBase(ABC):
     def __init__(self):
         self.object_points_filename = ""
         self.objectPointCloud = None
@@ -101,21 +103,119 @@ class PartialModelBase:
     
 
 class PMOctomapPy(PartialModelBase):
-    def __init__(self):
+    def __init__(self,voxel_resolution, voxel_voxdim=31):
         self.octree = None
         self.resolution = 0.0
         self.unknownVolume = 0.0
         self.unknownVolumeThreshold = 0.0
         self.unknownVolumeThresholdReached = False
+        self.voxel_voxdim = voxel_voxdim
+        self.voxel_resolution = voxel_resolution
+        self.dim_arreglo =  self.voxel_voxdim *  self.voxel_voxdim *  self.voxel_voxdim
+        self.voxel_points = self.__Get_voxpoints()
+        self.init()
 
     def init(self):
         super().init()
         # El Partial model va a leer su configuración y va a generar el octree
 
         #Inicializamos el octomap
-        octree = octomap.OcTree(self.voxel_resolution) # inicializamos el octree
+        self.octree = octomap.OcTree(self.voxel_resolution) # inicializamos el octree
         return True
         
-    def updateWithScan(self, file_name_scan: str, file_name_origin: str):
-        pass
+    def __readPointCloudfromPCD(self, file_name):
+        try:
+            cloud = o3d.io.read_point_cloud(file_name, remove_nan_points=True, remove_infinite_points = True)
+        except Exception as e:
+            print("Error while reading pointcloud : {}".format(e))
+            return None
+        return cloud
+    
+    def __Get_voxpoints(self, max_dim=.4):
+        #BBOX min & max
+        resolution = max_dim/self.voxel_voxdim
+        aabb_min = np.asarray([-(max_dim/2),-(max_dim/2),0.0])
+        aabb_max = np.asarray([(max_dim/2),(max_dim/2),max_dim])
+        center = (aabb_min + aabb_max) / 2
+        dimension = np.array([self.voxel_voxdim, self.voxel_voxdim, self.voxel_voxdim]) # Voxelization dimensions
+        origin = center - dimension/2  * resolution
+        #New BBox given the new resolution
+        grid = np.full(dimension, -1, np.int32)
+        transform = trimesh.transformations.scale_and_translate(
+            scale=resolution, translate=origin
+        )
+        # Voxelgrid encoding (create grid)
+        points = trimesh.voxel.VoxelGrid(encoding=grid, transform=transform).points # Voxel grid con los puntos de la nube
+        puntos = np.asarray(points)
+        return puntos
+    
+    def getOctree(self):
+        return self.octree
 
+    def updateWithScan(self, file_name_scan: str, file_name_origin: str):
+        
+        scan_cloud = self.__readPointCloudfromPCD(file_name_scan)
+        scan_cloud_origins = self.__readPointCloudfromPCD(file_name_origin)
+        
+        origin = np.asarray(scan_cloud_origins.points)[0]
+        self.octree.insertPointCloud(
+            pointcloud= np.asarray(scan_cloud.points), 
+            origin= np.asarray(origin), #Measurement origin
+            maxrange=-1, # maximum range for how long individual beams are inserted
+            )
+        self.octree.updateInnerOccupancy()
+
+
+    def evaluateView(self, v: 'ViewStructure') -> int:
+        print("NO")
+    
+ 
+    def stopCriteriaReached(self) -> bool:
+        return False
+
+    def savePartialModel(self, file_name: str) -> bool:
+        try:
+            direccion_octree= bytes(file_name, encoding='utf8')
+            self.octree.writeBinary(direccion_octree) 
+            return True
+        except Exception as e:
+            print("Error while saving octree : {}".format(e))
+            return False
+        
+
+    def loadPartialModel(self, file_name: str) -> bool:
+        try:
+            direccion_octree= bytes(file_name, encoding='utf8')
+            self.octree.readBinary(direccion_octree)
+            return True
+        except Exception as e:
+            print("Error while loading octree : {}".format(e))
+            return False
+
+    def __getOccupancyProbs(self):
+        arreglo = np.full((self.dim_arreglo), 0.5)
+        j = 0 
+        for i in self.voxel_points:
+            #Get occupancy probability given a position (x,y,z)
+            node = self.octree.search(i, 0)
+            # If the returned value is different than -1, indicates that a node is in that position
+            if node is not None:
+                try:
+                    probability = node.getOccupancy() #Can use getValues(), but extracts the log-odds
+                    arreglo[j] = probability 
+                except:
+                    pass
+            j += 1 
+        return arreglo  
+
+    def getUnknownVolume(self) -> float:
+        occupation = self.__getOccupancyProbs()         
+        return np.sum(occupation == 0.5)
+    
+
+    def readRays(self, file_address: str) -> int:
+        print("NO")
+    
+
+    def insertUnknownSurface(self, pc: 'Pointcloud') -> bool:
+       print("NO")
