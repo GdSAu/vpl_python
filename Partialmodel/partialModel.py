@@ -30,8 +30,19 @@ class PartialModelBase(ABC):
         self.x_sce_1, self.y_sce_1, self.z_sce_1 = 0.0, 0.0, 0.0
         self.x_sce_2, self.y_sce_2, self.z_sce_2 = 0.0, 0.0, 0.0
         self.objectResolution = 0.0
+
+    def readPointCloudfromPCD(self, file_name):
+        try:
+            cloud = o3d.io.read_point_cloud(file_name, remove_nan_points=True, remove_infinite_points = True)
+        except Exception as e:
+            print("Error while reading pointcloud : {}".format(e))
+            return None
+        return cloud    
     
-    
+    @abstractmethod
+    def getPartialModel(self):
+        pass
+
     @abstractmethod
     def updateWithScan(self, file_name_scan: str, file_name_origin: str) -> float:
         pass
@@ -105,12 +116,11 @@ class PartialModelBase(ABC):
 class PMOctomapPy(PartialModelBase):
     def __init__(self,voxel_resolution, voxel_voxdim=31):
         self.octree = None
-        self.resolution = 0.0
+        self.resolution = voxel_resolution
         self.unknownVolume = 0.0
         self.unknownVolumeThreshold = 0.0
         self.unknownVolumeThresholdReached = False
         self.voxel_voxdim = voxel_voxdim
-        self.voxel_resolution = voxel_resolution
         self.dim_arreglo =  self.voxel_voxdim *  self.voxel_voxdim *  self.voxel_voxdim
         self.voxel_points = self.__Get_voxpoints()
         self.init()
@@ -120,16 +130,9 @@ class PMOctomapPy(PartialModelBase):
         # El Partial model va a leer su configuración y va a generar el octree
 
         #Inicializamos el octomap
-        self.octree = octomap.OcTree(self.voxel_resolution) # inicializamos el octree
+        self.octree = octomap.OcTree(self.resolution) # inicializamos el octree
         return True
         
-    def __readPointCloudfromPCD(self, file_name):
-        try:
-            cloud = o3d.io.read_point_cloud(file_name, remove_nan_points=True, remove_infinite_points = True)
-        except Exception as e:
-            print("Error while reading pointcloud : {}".format(e))
-            return None
-        return cloud
     
     def __Get_voxpoints(self, max_dim=.4):
         #BBOX min & max
@@ -149,15 +152,17 @@ class PMOctomapPy(PartialModelBase):
         puntos = np.asarray(points)
         return puntos
     
-    def getOctree(self):
+    def getPartialModel(self):
+        super().getPartialModel()
         return self.octree
 
-    def updateWithScan(self, file_name_scan: str, file_name_origin: str):
+    def updateWithScan(self, file_name_scan: str, file_name_origin: str):#, origin):#
         
-        scan_cloud = self.__readPointCloudfromPCD(file_name_scan)
-        scan_cloud_origins = self.__readPointCloudfromPCD(file_name_origin)
+        scan_cloud = self.readPointCloudfromPCD(file_name_scan)
+        scan_cloud_origins = self.readPointCloudfromPCD(file_name_origin)
         
         origin = np.asarray(scan_cloud_origins.points)[0]
+ 
         self.octree.insertPointCloud(
             pointcloud= np.asarray(scan_cloud.points), 
             origin= np.asarray(origin), #Measurement origin
@@ -219,3 +224,64 @@ class PMOctomapPy(PartialModelBase):
 
     def insertUnknownSurface(self, pc: 'Pointcloud') -> bool:
        print("NO")
+
+class PMPointCloudPy(PartialModelBase):
+    def __init__(self,voxel_resolution):
+        self.pointcloud = None
+        self.resolution = voxel_resolution
+        self.init()
+
+    def init(self):
+        super().init()
+        self.pointcloud = o3d.geometry.PointCloud()
+        return True
+
+    def getPartialModel(self):
+        super().getPartialModel()
+        return self.pointcloud
+    
+    def updateWithScan(self, file_name_scan: str):
+        scan = self.readPointCloudfromPCD(file_name_scan)
+        Nube_acc = o3d.geometry.PointCloud()
+        Nube_acc.points = o3d.utility.Vector3dVector(np.vstack((self.pointcloud.points, scan.points)))
+        self.pointcloud = Nube_acc.voxel_down_sample(voxel_size= self.resolution)
+
+    def evaluateCandidateViews(self):
+        pass
+    
+    def evaluateCandidateViews(self, views: 'ViewList'):
+        pass
+    
+    
+    def evaluateView(self, v: 'ViewStructure') -> int:
+        pass
+    
+   
+    def stopCriteriaReached(self) -> bool:
+        pass
+    
+    def savePartialModel(self, file_name: str) -> bool:
+        try:
+            o3d.io.write_point_cloud(file_name, self.pointcloud, write_ascii=True)
+            return True
+        except Exception as e:
+            print("Error while saving pointcloud : {}".format(e))
+            return False
+    
+    def loadPartialModel(self, file_name: str) -> bool:
+        try:
+            self.pointcloud = self.readPointCloudfromPCD(file_name)
+            return True
+        except Exception as e:
+            print("Error while loading pointcloud : {}".format(e))
+            return False
+        
+    
+    def getUnknownVolume(self) -> float:
+        pass
+    
+    def readRays(self, file_address: str) -> int:
+        pass
+    
+    def insertUnknownSurface(self, pc: 'Pointcloud') -> bool:
+        pass
