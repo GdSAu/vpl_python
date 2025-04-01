@@ -1,6 +1,6 @@
 import open3d as o3d
 import numpy as np
-from Robotsensor.utils_o3d_v2 import Nube_acumulada_filtrada
+from utils.utils_o3d import Nube_acumulada_filtrada
 
 class updateModel:
 
