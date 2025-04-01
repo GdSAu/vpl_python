@@ -1,5 +1,5 @@
 import open3d as o3d
-from Robotsensor.utils_o3d_v2 import scale_and_translate
+from utils.utils_o3d import scale_and_translate
 
 class SceneLoader:
     '''

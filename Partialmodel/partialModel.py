@@ -69,15 +69,12 @@ class PartialModelBase(ABC):
     def loadPartialModel(self, file_name: str) -> bool:
         pass
     
-    @abstractmethod
     def getUnknownVolume(self) -> float:
         pass
     
-    @abstractmethod
     def readRays(self, file_address: str) -> int:
         pass
     
-    @abstractmethod
     def insertUnknownSurface(self, pc: 'Pointcloud') -> bool:
         pass
     
@@ -157,18 +154,24 @@ class PMOctomapPy(PartialModelBase):
         return self.octree
 
     def updateWithScan(self, file_name_scan: str, file_name_origin: str):#, origin):#
-        
-        scan_cloud = self.readPointCloudfromPCD(file_name_scan)
-        scan_cloud_origins = self.readPointCloudfromPCD(file_name_origin)
-        
-        origin = np.asarray(scan_cloud_origins.points)[0]
- 
-        self.octree.insertPointCloud(
-            pointcloud= np.asarray(scan_cloud.points), 
-            origin= np.asarray(origin), #Measurement origin
-            maxrange=-1, # maximum range for how long individual beams are inserted
-            )
-        self.octree.updateInnerOccupancy()
+        try:
+            
+            scan_cloud = self.readPointCloudfromPCD(file_name_scan)
+            scan_cloud_origins = self.readPointCloudfromPCD(file_name_origin)
+            
+            origin = np.asarray(scan_cloud_origins.points)[0]
+    
+            self.octree.insertPointCloud(
+                pointcloud= np.asarray(scan_cloud.points), 
+                origin= np.asarray(origin), #Measurement origin
+                maxrange=-1, # maximum range for how long individual beams are inserted
+                )
+            self.octree.updateInnerOccupancy()
+            return True
+        except Exception as e:
+            print("Error while updating octree : {}".format(e))
+            return False
+
 
 
     def evaluateView(self, v: 'ViewStructure') -> int:
@@ -241,10 +244,15 @@ class PMPointCloudPy(PartialModelBase):
         return self.pointcloud
     
     def updateWithScan(self, file_name_scan: str):
-        scan = self.readPointCloudfromPCD(file_name_scan)
-        Nube_acc = o3d.geometry.PointCloud()
-        Nube_acc.points = o3d.utility.Vector3dVector(np.vstack((self.pointcloud.points, scan.points)))
-        self.pointcloud = Nube_acc.voxel_down_sample(voxel_size= self.resolution)
+        try:
+            scan = self.readPointCloudfromPCD(file_name_scan)
+            Nube_acc = o3d.geometry.PointCloud()
+            Nube_acc.points = o3d.utility.Vector3dVector(np.vstack((self.pointcloud.points, scan.points)))
+            self.pointcloud = Nube_acc.voxel_down_sample(voxel_size= self.resolution)
+            return True
+        except Exception as e:
+            print("Error while updating pointcloud : {}".format(e))
+            return False
 
     def evaluateCandidateViews(self):
         pass
@@ -275,13 +283,5 @@ class PMPointCloudPy(PartialModelBase):
         except Exception as e:
             print("Error while loading pointcloud : {}".format(e))
             return False
-        
+
     
-    def getUnknownVolume(self) -> float:
-        pass
-    
-    def readRays(self, file_address: str) -> int:
-        pass
-    
-    def insertUnknownSurface(self, pc: 'Pointcloud') -> bool:
-        pass

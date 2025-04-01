@@ -3,11 +3,11 @@ import octomap
 import numpy as np
 import pandas as pd
 
-from Robotsensor.utils_o3d_v2 import Get_PointcloudGT, Get_voxpoints
-from Robotsensor.meshLoader import SceneLoader
+from utils.utils_o3d import Get_PointcloudGT, Get_voxpoints
+from Simulator.sceneCreator import SceneLoader
 from Robotsensor.sensor import Sensor
 from Partialmodel.modelupdate import updateModel
-from Reconstructor.reconstructorParams import Params
+from utils.reconstructorParams import Params
 
 class Reconstructor:
 
