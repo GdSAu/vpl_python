@@ -3,35 +3,35 @@ import yaml
 class Params:
 
     def __init__(self,filename):
-        with open(filename, 'r') as file:
-            self.params = yaml.safe_load(file)
+        try: 
+            with open(filename, 'r') as file:
+                self.params = yaml.safe_load(file)
+                self.__extractParameters()
+        except FileNotFoundError:
+            print(f"Error: File not found'{filename}'")
+        except yaml.YAMLError as e:
+            print(f"Error while parsing file: {e}")
+        except Exception as e:
+            print(f"Unexpected error: {e}")
 
-    def getCarpetaMetodo(self):
-        return self.params["carpetas"]["carpeta_metodo"]
-    
-    def getCarpetaIter(self):
-        return self.params["carpetas"]["carpeta_metodo"] + self.params["carpetas"]["iter"] 
-    
-    def getDireccionCarpeta(self):
-        return self.params["carpetas"]["direccion"]
-    
-    def getObjetoCarpeta(self):
-        return self.params["carpetas"]["objeto"]
-    
-    def getPesosCarpeta(self):
-        return self.params["carpetas"]["path_weights"]
-    
-    def getCSVName(self):
-        return self.params["carpetas"]["csv_name"]
-    
-    def getUmbralVariable(self):
-        return self.params["variables"]["umbral"]
-    
-    def getVoxelVariable(self):
-        return self.params["variables"]["voxel_resolution"]
-    
-    def getMaximumVariable(self):
-        return self.params["variables"]["maximum_views"]
-    
-    def getCameraParams(self):
-        return self.params["camera"]["img_H"], self.params["camera"]["img_W"], self.params["camera"]["up"],self.params["camera"]["fov"]
+    def __extractParameters(self):
+        if not self.params:
+            print(f"Warning: YAML file is empty or could not be loaded.")
+            self.result = {}
+        else:    
+            self.result = self.params
+
+    def getParameter(self, path: str):
+        
+        if not self.result:
+            # Si aún no se ha llamado a extractParameters, hacerlo ahora
+            self.extractParameters()
+            
+        parts = path.split('.')
+        current = self.result
+        
+        for part in parts:
+            if isinstance(current, dict) and part in current:
+                current = current[part]
+                
+        return current

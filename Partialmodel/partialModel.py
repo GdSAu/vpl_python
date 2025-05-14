@@ -1,9 +1,8 @@
 from abc import ABC, abstractmethod
-from typing import List, Tuple
-import numpy as np
-import octomap
-import open3d as o3d
-import trimesh
+import numpy as np # type: ignore
+import octomap # type: ignore
+import open3d as o3d # type: ignore
+import trimesh # type: ignore
 
 class PartialModelBase(ABC):
     def __init__(self):
@@ -153,13 +152,10 @@ class PMOctomapPy(PartialModelBase):
         super().getPartialModel()
         return self.octree
 
-    def updateWithScan(self, file_name_scan: str, file_name_origin: str):#, origin):#
+    def updateWithScan(self, file_name_scan: str, origin):#
         try:
             
             scan_cloud = self.readPointCloudfromPCD(file_name_scan)
-            scan_cloud_origins = self.readPointCloudfromPCD(file_name_origin)
-            
-            origin = np.asarray(scan_cloud_origins.points)[0]
     
             self.octree.insertPointCloud(
                 pointcloud= np.asarray(scan_cloud.points), 
@@ -200,7 +196,7 @@ class PMOctomapPy(PartialModelBase):
             print("Error while loading octree : {}".format(e))
             return False
 
-    def __getOccupancyProbs(self):
+    def getOccupancyProbs(self):
         arreglo = np.full((self.dim_arreglo), 0.5)
         j = 0 
         for i in self.voxel_points:
@@ -217,7 +213,7 @@ class PMOctomapPy(PartialModelBase):
         return arreglo  
 
     def getUnknownVolume(self) -> float:
-        occupation = self.__getOccupancyProbs()         
+        occupation = self.getOccupancyProbs()         
         return np.sum(occupation == 0.5)
     
 
