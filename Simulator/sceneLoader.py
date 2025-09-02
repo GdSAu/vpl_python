@@ -1,4 +1,5 @@
 import open3d as o3d
+from utils.utils_raycast import SimplePointCloudRaycast
 from utils.utils_o3d import scale_and_translate
 
 class SceneLoader:
@@ -61,5 +62,12 @@ class SceneLoader:
             scene.add_triangles(mesh1)
             return scene
 
-    def get_scenes(self, img_W, img_H):
-        return self.create_offrender_scene(img_W, img_H), self.create_raycast_scene()
+    def create_raycast_scene_pointcloud(self,img_W, img_H):
+        scene = SimplePointCloudRaycast(self.mesh_file, width=img_W, height=img_H, fov=45, search_radius=0.1)
+        return scene
+
+    def get_scenes(self, img_W, img_H, onlyraycast=False):
+        if onlyraycast == True:
+            return self.create_raycast_scene_pointcloud(img_W, img_H)
+        else:
+            return self.create_offrender_scene(img_W, img_H), self.create_raycast_scene()

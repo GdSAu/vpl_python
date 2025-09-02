@@ -14,8 +14,12 @@ class Sensor:
         self.up = up
         self.width = width
         self.height = height
-        self.render = kwargs["render"]
-        self.scene = kwargs["scene"]
+        self.only_raycasti = kwargs["raycast"]
+        if self.only_raycasti == True:
+            self.scene = kwargs["scene"]
+        else:
+            self.render = kwargs["render"]
+            self.scene = kwargs["scene"]
 
 
     def __extract_RGBD(self, center, eye):
@@ -37,8 +41,6 @@ class Sensor:
         img, depth = self.__extract_RGBD(center,eye)
         return img, depth
 
-
-
     def __extract_PointCloud(self, center, eye):
         """(scene, fov, center, eye, up, width, height) -> point cloud"""
         rays = o3d.t.geometry.RaycastingScene.create_rays_pinhole(
@@ -57,7 +59,10 @@ class Sensor:
     
     def savePointCloud(self, center, eye, file_name):
         """Save point cloud"""
-        points = self.__extract_PointCloud(center, eye)
+        if self.only_raycasti == True:
+            points = self.scene.create_visible_pointcloud(center, eye, step_factor=2)
+        else:
+            points = self.__extract_PointCloud(center, eye)
         pcd = o3d.geometry.PointCloud()
         pcd.points = o3d.utility.Vector3dVector(points.numpy())
         o3d.io.write_point_cloud(file_name, pcd, write_ascii=True)
@@ -77,7 +82,10 @@ class Sensor:
 
     def getPointcloud(self,center, eye):
         """return a point cloud object"""
-        points = self.__extract_PointCloud(center, eye)
+        if self.only_raycasti == True:
+            points = self.scene.create_visible_pointcloud(center, eye, step_factor=2)
+        else:
+            points = self.__extract_PointCloud(center, eye)
         pc = o3d.geometry.PointCloud()
         pc.points = o3d.utility.Vector3dVector(points.numpy())
         return pc
