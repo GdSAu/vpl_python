@@ -30,11 +30,10 @@ def Get_RGBD(render, fov, center, eye, up, direccion, i, itera):
    o3d.io.write_image(direccion +"RGB/"+ itera +"RGB_{}.png".format(i), img, 9)
    cv2.imwrite(direccion + "Depth/"+ itera +"D_{}.tiff".format(i), np.asarray(depth))
 
-def Get_PointcloudGT (direccion, mesh, itera):
+def Get_PointcloudGT (direccion, mesh, itera, number_of_points=16384):
   #Creamos nube de puntos GT
-  size = np.asarray(mesh.vertices).shape[0]
   mesh.compute_vertex_normals()
-  p_gt = mesh.sample_points_uniformly(number_of_points=size*10)
+  p_gt = mesh.sample_points_uniformly(number_of_points=number_of_points)
   o3d.io.write_point_cloud(direccion + "Point_cloud/"+ itera +"cloud_gt.pcd", p_gt, write_ascii=True)# GT cloud 
 
 def Nube_acumulada_filtrada(P_acu, z, voxel_size =0.0005):

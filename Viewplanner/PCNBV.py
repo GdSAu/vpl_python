@@ -47,12 +47,21 @@ class PCNBV(NBVPlanner):
         partial = np.asarray(self.partial_model.getPartialModel().points)
         self.scan_pc = np.append(self.scan_pc, partial, axis=0)
         partial = self.__resample_pcd(self.scan_pc, 1024)
-        partial_tensor = torch.tensor(partial[np.newaxis, ...].astype(np.float32)).permute(0, 2, 1).to(self.device)
-        view_state_tensor = torch.tensor(self.viewstate.astype(np.float32))[np.newaxis, ...].to(self.device)
-        _, eval_value = self.network(partial_tensor, view_state_tensor)
-        eval_value = eval_value[0].cpu().detach().numpy()      
+        with torch.no_grad():
+            partial_tensor = torch.tensor(partial[np.newaxis, ...].astype(np.float32)).permute(0, 2, 1).to(self.device)
+            view_state_tensor = torch.tensor(self.viewstate.astype(np.float32))[np.newaxis, ...].to(self.device)
+            _, eval_value = self.network(partial_tensor, view_state_tensor)
+            eval_value = eval_value[0].cpu().detach().numpy()      
         view = np.argmax(eval_value, axis = 0)
         nbv = self.viewspace[view]
         self.viewstate[view] = 1
+        # due to memory consumption
+        del partial
+        del partial_tensor
+        del view_state_tensor
+        del eval_value
+        del view
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
         return nbv
     
