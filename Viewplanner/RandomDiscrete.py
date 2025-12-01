@@ -2,10 +2,10 @@ from Viewplanner.viewPlanner import NBVPlanner
 import numpy as np
 
 
-class RandomPlanner(NBVPlanner):
+class RandomDiscretePlanner(NBVPlanner):
     def __init__(self, robot_sensor, partial_model, minrange=0):
         super().__init__(robot_sensor, partial_model)
-        self.poses_list = np.loadtxt("/mnt/6C24E28478939C77/Saulo/vpl_python/stuff/pcnbv/viewspace_shapenet_33_normal.txt") #np.load("stuff/poses.npy")
+        self.poses_list = np.loadtxt("/mnt/6C24E28478939C77/Saulo/vpl_python/stuff/pcnbv/viewspace_shapenet_33_normal.txt")
         self.poses_len = len(self.poses_list)
         self.random = np.random.default_rng()
         self.minrange = minrange
