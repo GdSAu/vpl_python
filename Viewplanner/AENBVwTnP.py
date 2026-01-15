@@ -1,3 +1,4 @@
+#Autoencoder with Translation near Point
 from Viewplanner.viewPlanner import NBVPlanner
 import numpy as np
 import torch

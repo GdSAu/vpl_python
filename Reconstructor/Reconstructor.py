@@ -22,6 +22,10 @@ class Reconstructor:
     def __readParams(self):
         self.params = Params(self.file_name)
 
+    def __resetMetrics(self):
+        del self.metrics
+        self.metrics = {"ID": [],"id_objeto": [], "iteracion_objeto":[],"pose_inicial":[], "nube_puntos":[], "rejilla":[], "nbv":[], "id_anterior":[], "id_siguiente":[], "chamfer":[], "ganancia_cobertura":[], "cobertura":[]}
+    
     def __loadParams(self):
         self.__readParams()
         self.carpeta_metodo = self.params.getParameter("carpetas.carpeta_metodo")
@@ -128,10 +132,17 @@ class Reconstructor:
             except Exception as e:
                 print("Error while loading PCNBV : {}".format(e))
         
-        if self.planner == "Random": #Planeador random
+        if self.planner == "RandomDiscrete": #Planeador random discreto
             try:
-                from Viewplanner.Random import RandomPlanner
-                self.viewPlanner = RandomPlanner("None", self.PM)
+                from Viewplanner.RandomDiscrete import RandomDiscretePlanner
+                self.viewPlanner = RandomDiscretePlanner("None", self.PM)
+            except Exception as e:
+                print("Error while loading Random planner: {}".format(e))
+        
+        if self.planner == "RandomContinuous": #Planeador random continuo
+            try:
+                from Viewplanner.RandomContinuous import RandomContinuousPlanner
+                self.viewPlanner = RandomContinuousPlanner("None", self.PM)
             except Exception as e:
                 print("Error while loading Random planner: {}".format(e))
 
@@ -470,11 +481,10 @@ class Reconstructor:
                 del self.PM
                 del self.viewPlanner
 
-            #print(metricas)   
-            #print("Volví, tonotos!")
             #almacena las métricas de error en archivo NPZ
             dataframe = pd.DataFrame(self.metrics, index=None)
             dataframe.to_csv(self.direccion + self.csv_name + "_" + str(self.ang) +".csv",index=False)
+            self.__resetMetrics()
 
     def runReconstuctorMultipleWoCnOnlyPC(self):
 
