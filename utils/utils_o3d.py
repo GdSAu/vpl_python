@@ -5,6 +5,39 @@ import trimesh
 import matplotlib.pyplot as plt
 import cv2
 
+
+class camara:
+    @staticmethod
+    def calcular_matriz_extrinsecas(eye, center, up):
+        # 1. Calcular vectores directores
+        z_axis = (center - eye) / np.linalg.norm(center - eye) # Forward
+        x_axis = np.cross(up, z_axis) / np.linalg.norm(np.cross(up, z_axis)) # Right
+        y_axis = np.cross(z_axis, x_axis) # Down (en Open3D Y apunta hacia abajo)
+
+        # 2. Construir matriz de rotación R (Mundo a Cámara)
+        R = np.vstack([x_axis, y_axis, z_axis]) 
+        
+        # 3. Traslación: t = -R @ eye
+        t = -R @ eye.reshape(3, 1)
+
+        # 4. Matriz 4x4
+        view_matrix = np.eye(4)
+        view_matrix[:3, :3] = R
+        view_matrix[:3, 3:] = t
+        return view_matrix
+
+    @staticmethod
+    def calcular_matriz_intrinseca(fov, ancho, alto):
+        fov_rad = np.deg2rad(fov)
+        # Focal basada en el ancho (FOV horizontal)
+        f = ancho / (2 * np.tan(fov_rad / 2))
+        
+        return np.array([
+            [f, 0, ancho / 2],
+            [0, f, alto / 2], # Usamos la misma f para que sea cuadrado
+            [0, 0, 1]
+        ])
+
 def scale_and_translate(mesh, scale_factor=0.4):
   max = mesh.get_max_bound()
   scale = scale_factor/np.max(max)

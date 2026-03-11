@@ -1,4 +1,63 @@
 import numpy as np
+import open3d as o3d
+import json
+import os
+from .utils_o3d import camara
+
+def save_camera_trayectory(direccion, eyes, cent, up, fov, width, height, method_name:str, iteration_name:str):
+    # 1. Preparar la parte de Open3D (mantenemos compatibilidad)
+    intrinsic_np = camara.calcular_matriz_intrinseca(fov, width, height)
+    cam_intrinsic = o3d.camera.PinholeCameraIntrinsic(width, height, intrinsic_np)
+    
+    # FOV en radianes para el formato Synthetic
+    camera_angle_x = np.deg2rad(fov)
+    frames_nerf = []
+    params_list = []
+    
+    for i, eye_pos in enumerate(eyes):
+        # A. Extrínseca de tu clase (Mundo a Cámara - OpenCV)
+        ext = camara.calcular_matriz_extrinsecas(eye_pos, cent, up)
+        
+        # Guardar para Open3D
+        p = o3d.camera.PinholeCameraParameters()
+        p.extrinsic = ext
+        p.intrinsic = cam_intrinsic
+        params_list.append(p)
+        
+        # B. Para NeRF Blender/Synthetic (Cámara a Mundo - OpenGL)
+        c2w = np.linalg.inv(ext)
+        
+        # Inversión de ejes Y y Z (OpenCV -> OpenGL)
+        c2w_blender = c2w.copy()
+        c2w_blender[0:3, 1:3] *= -1 
+        
+        frames_nerf.append({
+            "file_path": f"./{iteration_name}RGB_{i}", # Siguiendo tu formato r_0, r_1...
+            "rotation": 0.0, # Valor por defecto si no tienes rotación de cámara extra
+            "transform_matrix": c2w_blender.tolist()
+        })
+        
+    # 2. Guardar JSON en formato Synthetic de Blender
+    transforms = {
+        "camera_angle_x": float(camera_angle_x),
+        "frames": frames_nerf
+    }
+    
+    # Guardar ambos archivos
+    ruta_carpetas = os.path.join(direccion, "RGB", method_name)
+    iteration_name = iteration_name.rstrip('/')
+    ruta_final = os.path.join(ruta_carpetas, f"{iteration_name}_transforms_nerf.json")
+    print(ruta_final)
+    trayectoria_o3d = o3d.camera.PinholeCameraTrajectory()
+    trayectoria_o3d.parameters = params_list
+    o3d.io.write_pinhole_camera_trajectory((os.path.join(ruta_carpetas, f"{iteration_name}_trayectory_camara.json")), trayectoria_o3d)
+        
+    try:
+        with open(ruta_final, "w") as f:
+            json.dump(transforms, f, indent=4)
+        print(f"Successfully saved camera trajectory")
+    except Exception as e:
+        print(f"Error: {e}")
 
 def GuardarDS(ds,I,i,obj_name,v_ini,v, itera,cd, distance,cov):
     """
