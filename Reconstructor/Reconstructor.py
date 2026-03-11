@@ -17,17 +17,17 @@ class Reconstructor:
     def __init__(self,file_name):
         self.file_name = file_name
         self.metrics = {"ID": [],"id_objeto": [], "iteracion_objeto":[],"pose_inicial":[], "nube_puntos":[], "rejilla":[], "nbv":[], "id_anterior":[], "id_siguiente":[], "chamfer":[], "ganancia_cobertura":[], "cobertura":[]}
-        self.__loadParams()
+        self._loadParams()
     
-    def __readParams(self):
+    def _readParams(self):
         self.params = Params(self.file_name)
 
-    def __resetMetrics(self):
+    def _resetMetrics(self):
         del self.metrics
         self.metrics = {"ID": [],"id_objeto": [], "iteracion_objeto":[],"pose_inicial":[], "nube_puntos":[], "rejilla":[], "nbv":[], "id_anterior":[], "id_siguiente":[], "chamfer":[], "ganancia_cobertura":[], "cobertura":[]}
     
-    def __loadParams(self):
-        self.__readParams()
+    def _loadParams(self):
+        self._readParams()
         self.carpeta_metodo = self.params.getParameter("carpetas.carpeta_metodo")
         self.carpeta_iter = self.params.getParameter("carpetas.iter")
         self.direccion = self.params.getParameter("carpetas.direccion")
@@ -47,28 +47,7 @@ class Reconstructor:
         self.floor = self.params.getParameter("simulation.requieres_floor")
         self.dirtoPC = self.direccion + "Point_cloud/" + self.carpeta_metodo + self.carpeta_iter
     
-    def __createFolder(self):
-        try:
-            if os.path.lexists(self.direccion+"Point_cloud/") == False:
-                os.mkdir(self.direccion +"Point_cloud/" )
-                os.mkdir(self.direccion +"Octree/")
-                os.mkdir(self.direccion + "RGB/" )
-                os.mkdir(self.direccion + "Depth/")
-            if os.path.lexists(self.direccion+"Point_cloud/"+ self.carpeta_metodo) == False:
-                os.mkdir(self.direccion +"Point_cloud/" + self.carpeta_metodo)
-                os.mkdir(self.direccion +"Octree/"+ self.carpeta_metodo)
-                os.mkdir(self.direccion + "RGB/" + self.carpeta_metodo)
-                os.mkdir(self.direccion + "Depth/" + self.carpeta_metodo)
-            if os.path.lexists(self.direccion+"Point_cloud/"+ self.carpeta_metodo) == True:
-                os.mkdir(self.direccion +"Point_cloud/" + self.carpeta_metodo + "/"+ self.carpeta_iter)
-                os.mkdir(self.direccion +"Octree/"+ self.carpeta_metodo+ "/"+ self.carpeta_iter)
-                os.mkdir(self.direccion + "RGB/" + self.carpeta_metodo+ "/"+ self.carpeta_iter)
-                os.mkdir(self.direccion + "Depth/" + self.carpeta_metodo+ "/"+ self.carpeta_iter)
-
-        except:
-            print("La carpeta de {} ya existe, no se sobreescribe".format(self.carpeta_iter))
-
-    def __createFolderMulti(self):
+    def _createFolder(self):
         try:
             if os.path.lexists(self.direccionobj+"Point_cloud/") == False:
                 os.mkdir(self.direccionobj +"Point_cloud/" )
@@ -85,10 +64,11 @@ class Reconstructor:
                 os.mkdir(self.direccionobj +"Octree/"+ self.carpeta_metodo+ "/"+ self.carpeta_iter)
                 os.mkdir(self.direccionobj + "RGB/" + self.carpeta_metodo+ "/"+ self.carpeta_iter)
                 os.mkdir(self.direccionobj + "Depth/" + self.carpeta_metodo+ "/"+ self.carpeta_iter)
+
         except:
             print("La carpeta de {} ya existe, no se sobreescribe".format(self.carpeta_iter))
 
-    def __initSensor(self,render,scene):
+    def _initSensor(self,render,scene):
         if self.pc_only == True:
             self.sensor = Sensor(self.fov,self.up,self.img_W,self.img_H,raycast = self.pc_only,scene=scene)
         else:
@@ -96,7 +76,7 @@ class Reconstructor:
         
         
     
-    def __initViewPlanner(self):
+    def _initViewPlanner(self):
         if self.planner == "AutoEncoder":
             try:
                 from Viewplanner.AENBV import AENBV
@@ -146,11 +126,60 @@ class Reconstructor:
             except Exception as e:
                 print("Error while loading Random planner: {}".format(e))
 
-    def __initPartialModel(self):
+    def _initPartialModel(self):
         if self.requieredPM == "octree":
             self.PM = PMOctomapPy(self.params.getParameter("variables.voxel_resolution"),self.params.getParameter("variables.voxel_dim"))
         if self.requieredPM == "pointcloud":
             self.PM = PMPointCloudPy(self.params.getParameter("variables.umbral"))
+
+    def _initProcess(self, initialpose: int = 116, type_process: str = "single", l: int = 0):
+        self._initPartialModel()
+        self._initViewPlanner()
+        if type_process == "single":
+            self.direccionobj = self.direccion + self.objeto + "/"
+        elif type_process == "multiple":
+            self.direccionobj = self.direccionf + self.listado_objetos[l] + "/"
+        
+        self._createFolder()
+        self.dirtoPC = self.direccionobj + "Point_cloud/" + self.carpeta_metodo + self.carpeta_iter
+        #Cargamos malla
+        self.miEscena = SceneLoader(self.direccionobj,self.floor)
+        self.render, self.scene = self.miEscena.get_scenes(self.img_H,self.img_W)
+        
+        #Obtenemos pointcloud GT
+        Get_PointcloudGT(self.direccionobj, self.miEscena.mesh, self.carpeta_metodo + self.carpeta_iter)
+
+        #Camera vectors setup
+        self.cent = self.miEscena.mesh.get_center()
+        
+        poses = np.load("stuff/poses.npy")
+        self.eye_init = poses[initialpose]
+        self.eye = self.eye_init
+        self.eyes = []
+        self.eyes.append(self.eye_init)
+        #Set sensor
+        self._initSensor(self.render, self.scene)
+
+    def _saveData(self,i):
+        self.sensor.savePointCloud(self.cent, self.eye, file_name= self.dirtoPC  + self.params.getParameter("filenames.Pointcloud").format(i) )
+        self.sensor.saveAccPointCloud(i,direction = self.dirtoPC, file_name= self.dirtoPC + self.params.getParameter("filenames.Pointcloud"))
+        self.sensor.saveRGBD(self.cent, self.eye, 
+                                rgb_file_name= self.direccionobj + "RGB/" + self.carpeta_metodo + self.carpeta_iter + self.params.getParameter("filenames.RGB").format(i), 
+                                 depth_file_name =self.direccionobj + "Depth/" + self.carpeta_metodo + self.carpeta_iter + self.params.getParameter("filenames.Depth").format(i))
+
+    def _updateModels(self,i):
+        if self.requieredPM == "octree":
+            self.viewPlanner.updateWithScan(pointcloud = self.dirtoPC + self.params.getParameter("filenames.Pointcloud").format(i)  , origin = self.eye)
+            self.viewPlanner.savePartialModel(file_name= self.direccionobj + "Octree/" + self.carpeta_metodo + self.carpeta_iter + self.params.getParameter("filenames.Octree").format(i) )
+        
+        if self.requieredPM == "pointcloud":
+            self.viewPlanner.updateWithScan(pointcloud = self.dirtoPC + self.params.getParameter("filenames.Pointcloud").format(i))
+
+    def _evaluateModel(self,i):
+        CD = chamfer_distance(self.direccionobj + "Point_cloud/" + self.carpeta_metodo, self.carpeta_iter)
+        condicion, coverage_gain = Get_cloud_distance(self.direccionobj + "Point_cloud/" + self.carpeta_metodo , i, self.carpeta_iter)
+        cov = getCobertura(self.direccionobj + "Point_cloud/" + self.carpeta_metodo, self.carpeta_iter, i, umbral=self.umbral)
+        return CD, condicion, coverage_gain, cov
 
     def runReconstuctor(self):
         self.__initPartialModel()
