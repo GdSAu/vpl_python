@@ -38,13 +38,20 @@ class camara:
             [0, 0, 1]
         ])
 
-def scale_and_translate(mesh, scale_factor=0.4):
-  max = mesh.get_max_bound()
-  scale = scale_factor/np.max(max)
-  mesh.scale(scale, center= mesh.get_center())#Scale mesh
-  traslacion = - np.asarray(mesh.get_min_bound())[2]
-  traslacion =  [0,0,traslacion]
-  mesh.translate(traslacion) #translate mesh
+def scale_and_translate(mesh, scale_factor=0.4, use_extent=False):
+  if len(mesh.vertices) == 0:
+      raise ValueError("Mesh cargado sin vertices — revisa el formato del OBJ")
+  min_b = np.asarray(mesh.get_min_bound())
+  max_b = np.asarray(mesh.get_max_bound())
+  divisor = np.max(max_b - min_b) if use_extent else np.max(max_b)
+  if divisor == 0:
+      raise ValueError("Mesh con bounds en cero — no se puede escalar")
+  scale = scale_factor / divisor
+  mesh.scale(scale, center=mesh.get_center())
+  min_b = np.asarray(mesh.get_min_bound())
+  max_b = np.asarray(mesh.get_max_bound())
+  center_xy = (min_b[:2] + max_b[:2]) / 2
+  mesh.translate([-center_xy[0], -center_xy[1], -min_b[2]])
   return mesh
 
 def Get_RGBD(render, fov, center, eye, up, direccion, i, itera):

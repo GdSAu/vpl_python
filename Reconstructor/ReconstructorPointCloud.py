@@ -4,13 +4,12 @@ import pandas as pd
 from .Reconstructor import Reconstructor
 from utils.utils_save import GuardarDS, save_camera_trayectory
 
-class ReconstructorSimple(Reconstructor):
+class ReconstructorPointCloud(Reconstructor):
     def __init__(self, file_name):
         super().__init__(file_name)
 
-    def runReconstruction(self, initialpose: int = 116):
-        #Scene loading|
-        self._initProcess(initialpose, type_process="single")
+    def runReconstructionMultipleWithoutCondition(self,initialpose: int = 116):
+        self._initProcess(type_process="multiple",initialpose=initialpose)
         I = 0
         print("Initializing reconstruction MaxViews process ...")
         #while condicion == False:
@@ -21,15 +20,7 @@ class ReconstructorSimple(Reconstructor):
             self._updateModels(i)            
             ## Aqui evaluamos si esta completo el modelo en este punto
             CD, _, coverage_gain, cov = self._evaluateModel(i)
-            if self.Scov is not None and cov >= self.Scov:
-                # Cobertura(Pacu, Wobj) >= Scov: paro anticipado, igual que la condicion
-                # "mientras Cobertura(Pacu, Wobj) < Scov" del pseudocodigo -- ya se guardo
-                # el escaneo/actualizacion de esta ronda arriba, solo no se planea una
-                # vista siguiente porque ya no hace falta.
-                print("Cobertura objetivo alcanzada: {:.2f} >= Scov={:.2f}, deteniendo en ronda {}".format(
-                    cov, self.Scov, i))
-                break
-            start_time = time.time()
+            start_time = time.time()    
             self.eye = self.viewPlanner.PlanNBV()
             self.eyes.append(self.eye)
             print("--- %s seconds ---" % (time.time() - start_time))

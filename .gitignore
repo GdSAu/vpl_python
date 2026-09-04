@@ -3,3 +3,8 @@
 Viewplanner/AENBV.py
 dataexample/paramsAE.yaml
 dataexample/
+test_renders/
+plan/
+.claude/
+logs_shapenet_extraction/
+CAMBIOS_NBVCLASSICS.md
