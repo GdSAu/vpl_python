@@ -37,6 +37,13 @@ class Reconstructor:
         self.umbral = self.params.getParameter("variables.umbral")
         self.umbral_cov = self.params.getParameter("variables.umbral_cov")
         self.max_views = self.params.getParameter("variables.maximum_views")
+        # Scov (umbral de cobertura para paro anticipado, escala 0-100 igual que
+        # getCobertura()) es opcional: si el YAML no lo define, self.Scov queda en
+        # None y el comportamiento es identico al actual (siempre corre max_views
+        # rondas) -- getParameter() devuelve el dict padre completo, no None, cuando
+        # la ultima parte de la ruta no existe, asi que no se puede usar directo aqui.
+        variables = self.params.getParameter("variables")
+        self.Scov = variables.get("Scov") if isinstance(variables, dict) else None
         self.img_H = self.params.getParameter("camera.img_H")
         self.img_W = self.params.getParameter("camera.img_W")
         self.up = self.params.getParameter("camera.up")
@@ -45,6 +52,8 @@ class Reconstructor:
         self.planner = self.params.getParameter("planner")
         self.pc_only = self.params.getParameter("pointcloudonly")
         self.floor = self.params.getParameter("simulation.requieres_floor")
+        use_extent_param = self.params.getParameter("simulation.use_extent")
+        self.use_extent = use_extent_param if isinstance(use_extent_param, bool) else False
         self.dirtoPC = self.direccion + "Point_cloud/" + self.carpeta_metodo + self.carpeta_iter
     
     def _createFolder(self):
@@ -126,6 +135,22 @@ class Reconstructor:
             except Exception as e:
                 print("Error while loading Random planner: {}".format(e))
 
+        if self.planner == "OverlapNBV":
+            try:
+                from Viewplanner.OverlapNBV import OverlapNBV
+                point_cloud_dir = self.direccionobj + "Point_cloud/" + self.carpeta_metodo + self.carpeta_iter
+                gt_path = point_cloud_dir + "cloud_gt.pcd"
+                view_vectors_dir = self.direccionobj + "ViewVectors/" + self.carpeta_metodo + self.carpeta_iter
+                octree_dir = self.direccionobj + "Octree/" + self.carpeta_metodo + self.carpeta_iter
+                self.viewPlanner = OverlapNBV("None", self.PM, self.params.getParameter("carpetas.viewspace"),
+                                               gt_path, view_vectors_dir, point_cloud_dir, octree_dir,
+                                               thresh1=self.params.getParameter("variables.thresh1"),
+                                               thresh2=self.params.getParameter("variables.thresh2"),
+                                               voxel_resolution=self.params.getParameter("variables.voxel_resolution"),
+                                               voxel_voxdim=self.params.getParameter("variables.voxel_dim"))
+            except Exception as e:
+                print("Error while loading OverlapNBV: {}".format(e))
+
     def _initPartialModel(self):
         if self.requieredPM == "octree":
             self.PM = PMOctomapPy(self.params.getParameter("variables.voxel_resolution"),self.params.getParameter("variables.voxel_dim"))
@@ -134,24 +159,32 @@ class Reconstructor:
 
     def _initProcess(self, initialpose: int = 116, type_process: str = "single", l: int = 0):
         self._initPartialModel()
-        self._initViewPlanner()
         if type_process == "single":
             self.direccionobj = self.direccion + self.objeto + "/"
         elif type_process == "multiple":
             self.direccionobj = self.direccionf + self.listado_objetos[l] + "/"
-        
+
         self._createFolder()
         self.dirtoPC = self.direccionobj + "Point_cloud/" + self.carpeta_metodo + self.carpeta_iter
         #Cargamos malla
-        self.miEscena = SceneLoader(self.direccionobj,self.floor)
-        self.render, self.scene = self.miEscena.get_scenes(self.img_H,self.img_W)
-        
+        self.miEscena = SceneLoader(self.direccionobj, self.floor, use_extent=self.use_extent)
+        if self.pc_only == True:
+            self.render = self.miEscena.get_scenes(self.img_H,self.img_W, only_raycast=self.pc_only)
+            self.scene = None
+        else:
+            self.render, self.scene = self.miEscena.get_scenes(self.img_H,self.img_W)
+
         #Obtenemos pointcloud GT
         Get_PointcloudGT(self.direccionobj, self.miEscena.mesh, self.carpeta_metodo + self.carpeta_iter)
 
+        # _initViewPlanner() va aca (no al principio): OverlapNBV necesita direccionobj/carpeta_metodo/
+        # carpeta_iter y el cloud_gt.pcd que Get_PointcloudGT acaba de escribir. Sigue siendo antes del
+        # sensor real -- ningun planificador necesita el sensor para su propia inicializacion.
+        self._initViewPlanner()
+
         #Camera vectors setup
         self.cent = self.miEscena.mesh.get_center()
-        
+
         poses = np.load("stuff/poses.npy")
         self.eye_init = poses[initialpose]
         self.eye = self.eye_init
@@ -187,7 +220,7 @@ class Reconstructor:
         self.direccion = self.direccion + self.objeto + "/"
         self.__createFolder()
         #Cargamos malla
-        miEscena = SceneLoader(self.direccion,self.floor)
+        miEscena = SceneLoader(self.direccion, self.floor, use_extent=self.use_extent)
         render, scene = miEscena.get_scenes(self.img_H,self.img_W)
         
         #Obtenemos pointcloud GT
@@ -252,7 +285,7 @@ class Reconstructor:
         self.__createFolder()
         self.dirtoPC = self.direccion + "Point_cloud/" + self.carpeta_metodo + self.carpeta_iter
         #Cargamos malla
-        miEscena = SceneLoader(self.direccion,self.floor)
+        miEscena = SceneLoader(self.direccion, self.floor, use_extent=self.use_extent)
         render, scene = miEscena.get_scenes(self.img_H,self.img_W)
         
         #Obtenemos pointcloud GT
@@ -312,13 +345,13 @@ class Reconstructor:
         self.direccionf = self.direccion + self.objectFolder+ "/"
         self.listado_objetos = os.listdir(self.direccionf)
         for l in range (0, len(self.listado_objetos)):
-            self.__initPartialModel()
-            self.__initViewPlanner()
+            self._initPartialModel()
+            self._initViewPlanner()
             #Cargamos malla
             self.direccionobj = self.direccionf + self.listado_objetos[l] + "/"
-            self.__createFolderMulti()
+            self._createFolder()
             self.objeto = self.listado_objetos[l]
-            miEscena = SceneLoader(self.direccionobj,self.floor)
+            miEscena = SceneLoader(self.direccionobj, self.floor, use_extent=self.use_extent)
             render, scene = miEscena.get_scenes(self.img_H,self.img_W)
             self.dirtoPC = self.direccionobj + "Point_cloud/" + self.carpeta_metodo + self.carpeta_iter
             #Obtenemos pointcloud GT
@@ -332,7 +365,7 @@ class Reconstructor:
             eye = eye_init
             
             #Set sensor
-            self.__initSensor(render,scene)
+            self._initSensor(render,scene)
 
             I = 0
             print("Initializing reconstruction process ...")
@@ -391,7 +424,7 @@ class Reconstructor:
             self.direccionobj = self.direccionf + self.listado_objetos[l] + "/"
             self.__createFolderMulti()
             self.objeto = self.listado_objetos[l]
-            miEscena = SceneLoader(self.direccionobj,self.floor)
+            miEscena = SceneLoader(self.direccionobj, self.floor, use_extent=self.use_extent)
             render, scene = miEscena.get_scenes(self.img_H,self.img_W)
             self.dirtoPC = self.direccionobj + "Point_cloud/" + self.carpeta_metodo + self.carpeta_iter
             #Obtenemos pointcloud GT
@@ -454,13 +487,13 @@ class Reconstructor:
             self.direccionf = self.direccion + self.objectFolder+ "/"
             self.listado_objetos = os.listdir(self.direccionf)
             for l in range (0, len(self.listado_objetos)):
-                self.__initPartialModel()
-                self.__initViewPlanner()
+                self._initPartialModel()
+                self._initViewPlanner()
                 #Cargamos malla
                 self.direccionobj = self.direccionf + self.listado_objetos[l] + "/"
-                self.__createFolderMulti()
+                self._createFolder()
                 self.objeto = self.listado_objetos[l]
-                miEscena = SceneLoader(self.direccionobj,self.floor)
+                miEscena = SceneLoader(self.direccionobj, self.floor, use_extent=self.use_extent)
                 render, scene = miEscena.get_scenes(self.img_H,self.img_W)
                 self.dirtoPC = self.direccionobj + "Point_cloud/" + self.carpeta_metodo + self.carpeta_iter
                 #Obtenemos pointcloud GT
@@ -474,7 +507,7 @@ class Reconstructor:
                 eye = eye_init
                 
                 #Set sensor
-                self.__initSensor(render,scene)
+                self._initSensor(render,scene)
 
                 I = 0
                 print("Initializing reconstruction process ...")
@@ -512,8 +545,8 @@ class Reconstructor:
 
             #almacena las métricas de error en archivo NPZ
             dataframe = pd.DataFrame(self.metrics, index=None)
-            dataframe.to_csv(self.direccion + self.csv_name + "_" + str(self.ang) +".csv",index=False)
-            self.__resetMetrics()
+            dataframe.to_csv(self.csv_name + "_" + str(self.ang) +".csv",index=False)
+            self._resetMetrics()
 
     def runReconstuctorMultipleWoCnOnlyPC(self):
 
@@ -521,13 +554,13 @@ class Reconstructor:
         self.direccionf = self.direccion + self.objectFolder+ "/"
         self.listado_objetos = os.listdir(self.direccionf)
         for l in range (0, len(self.listado_objetos)):
-            self.__initPartialModel()
-            self.__initViewPlanner()
+            self._initPartialModel()
+            self._initViewPlanner()
             #Cargamos malla
             self.direccionobj = self.direccionf + self.listado_objetos[l] + "/"
-            self.__createFolderMulti()
+            self._createFolder()
             self.objeto = self.listado_objetos[l]
-            miEscena = SceneLoader(self.direccionobj,self.floor)
+            miEscena = SceneLoader(self.direccionobj, self.floor, use_extent=self.use_extent)
             render, scene = miEscena.get_scenes(self.img_H,self.img_W, self.pc_only)
             self.dirtoPC = self.direccionobj + "Point_cloud/" + self.carpeta_metodo + self.carpeta_iter
             #Obtenemos pointcloud GT
@@ -541,7 +574,7 @@ class Reconstructor:
             eye = eye_init
             
             #Set sensor
-            self.__initSensor(render,scene)
+            self._initSensor(render,scene)
 
             I = 0
             print("Initializing reconstruction process ...")
@@ -578,4 +611,4 @@ class Reconstructor:
         #print("Volví, tonotos!")
         #almacena las métricas de error en archivo NPZ
         dataframe = pd.DataFrame(self.metrics, index=None)
-        dataframe.to_csv(self.direccion + self.csv_name ,index=False)
+        dataframe.to_csv(self.csv_name ,index=False)

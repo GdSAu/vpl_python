@@ -59,6 +59,37 @@ def save_camera_trayectory(direccion, eyes, cent, up, fov, width, height, method
     except Exception as e:
         print(f"Error: {e}")
 
+def save_nerfstudio_transforms(direccion, eyes, cent, up, fov, method_name: str, iteration_name: str):
+    """Same extrinsics math as save_camera_trayectory (OpenCV world->camera,
+    inverted + Y/Z-flipped into Blender/NeRF-synthetic camera->world), but
+    written directly in the layout NerfStudio's BlenderDataParser expects:
+    transforms_{train,val,test}.json living next to the RGB_{i}.png frames,
+    with extension-less relative file_path. Avoids the extra conversion step
+    (NBV_implicit's nerf_converter.py) that today's save_camera_trayectory needs.
+    """
+    camera_angle_x = np.deg2rad(fov)
+    frames = []
+    for i, eye_pos in enumerate(eyes):
+        ext = camara.calcular_matriz_extrinsecas(eye_pos, cent, up)
+        c2w = np.linalg.inv(ext)
+        c2w_blender = c2w.copy()
+        c2w_blender[0:3, 1:3] *= -1
+        frames.append({
+            "file_path": "./RGB_{}".format(i),
+            "rotation": 0.0,
+            "transform_matrix": c2w_blender.tolist()
+        })
+
+    transforms = {"camera_angle_x": float(camera_angle_x), "frames": frames}
+
+    ruta_carpeta = os.path.join(direccion, "RGB", method_name.strip('/'), iteration_name.strip('/'))
+    os.makedirs(ruta_carpeta, exist_ok=True)
+    for split in ("train", "val", "test"):
+        with open(os.path.join(ruta_carpeta, "transforms_{}.json".format(split)), "w") as f:
+            json.dump(transforms, f, indent=4)
+    return ruta_carpeta
+
+
 def GuardarDS(ds,I,i,obj_name,v_ini,v, itera,cd, distance,cov):
     """
     ds: objeto para almacenar los datos

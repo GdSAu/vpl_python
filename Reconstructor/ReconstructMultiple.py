@@ -28,7 +28,7 @@ class ReconstructorMultiple(Reconstructor):
 
             for l in range (0, len(self.listado_objetos)):
                 self._initProcess(initialpose, type_process="multiple", l=l)
-
+                self.objeto = self.listado_objetos[l]
                 I = 0
                 print("Initializing reconstruction process ...")
                 #while condicion == False:
@@ -62,13 +62,14 @@ class ReconstructorMultiple(Reconstructor):
                     iteration_name=str(self.carpeta_iter)
                 )
             dataframe = pd.DataFrame(self.metrics, index=None)
-            dataframe.to_csv(self.direccionf + self.csv_name ,index=False)
+            dataframe.to_csv(self.csv_name ,index=False)
         
     def runReconstructionWithoutCondition(self, initialpose: int = 116):
         self._listObjects()
 
         for l in range (0, len(self.listado_objetos)):
             self._initProcess(initialpose, type_process="multiple", l=l)
+            self.objeto = self.listado_objetos[l]
 
             I = 0
             print("Initializing reconstruction process ...")
@@ -99,4 +100,4 @@ class ReconstructorMultiple(Reconstructor):
                 iteration_name=str(self.carpeta_iter)
             )
         dataframe = pd.DataFrame(self.metrics, index=None)
-        dataframe.to_csv(self.direccionf + self.csv_name ,index=False)
+        dataframe.to_csv(self.csv_name ,index=False)
